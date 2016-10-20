@@ -1,8 +1,8 @@
 .idea/
 *.iml
 
-# dist
-dist/
+# source
+js/
 
 
 # Commons
