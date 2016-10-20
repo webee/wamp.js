@@ -3,6 +3,9 @@
 
 # source
 js/
+.npmignore
+.eslintrc
+.babelrc
 
 
 # Commons

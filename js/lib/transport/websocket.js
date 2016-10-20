@@ -77,7 +77,10 @@ export class Factory {
 				transport.onmessage(msg);
 			}
 
-			websocket.onopen = function () {
+			websocket.onopen = function (evt) {
+				if (!websocket.protocol) {
+					websocket.protocol = "wamp.2.json";
+				}
 				var serializer_part = websocket.protocol.split('.')[2];
 				for (var index in self._options.serializers) {
 					var serializer = self._options.serializers[index];
