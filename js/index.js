@@ -1,3 +1,2 @@
-export default {
-	name: "wamp.js"
-};
+import * as wamp from './lib/wamp';
+export default wamp;
