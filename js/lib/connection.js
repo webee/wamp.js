@@ -322,7 +322,12 @@ export class Connection {
 			self._transport.close(1000);
 		};
 
-		self._transport.onclose = function (evt) {
+		self._transport.onclose = (function (evt) {
+			if (this !== self._transport) {
+				// already tried reconnect.
+				return;
+			}
+
 			// remove any pending reconnect timer
 			self._autoreconnect_reset_timer();
 
@@ -382,22 +387,28 @@ export class Connection {
 
 			// automatic reconnection
 			//
-			if (self._retry && !stop_retrying) {
-				if (next_retry.will_retry) {
-					self._is_retrying = true;
+			if (self._retry) {
+				if (!stop_retrying) {
+					if (next_retry.will_retry) {
+						self._is_retrying = true;
 
-					log.debug("retrying in " + next_retry.delay + " s");
-					self._retry_timer = setTimeout(::self._do_retry, next_retry.delay * 1000);
-				} else {
-					log.debug("giving up trying to reconnect");
+						log.debug("retrying in " + next_retry.delay + " s");
+						self._retry_timer = setTimeout(::self._do_retry, next_retry.delay * 1000);
+					} else {
+						log.debug("giving up trying to reconnect");
+						if (self.status !== STATUS.CLOSED) {
+							details.will_retry = false;
+							// emit status
+							self._change_status(STATUS.CLOSED, details);
+						}
+					}
+				} else if (self.status !== STATUS.CLOSED) {
+					details.will_retry = false;
+					// emit status
+					self._change_status(STATUS.CLOSED, details);
 				}
 			}
-			if (self.status !== STATUS.CLOSED) {
-				details.will_retry = false;
-				// emit status
-				self._change_status(STATUS.CLOSED, details);
-			}
-		};
+		}).bind(self._transport);
 
 		// open transport.
 		self._transport.open();
