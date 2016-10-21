@@ -20,3 +20,23 @@ new autobahn.Connection(...);
 import wamp = require('wamp.js');
 new wamp.Connection(...);
 ```
+
+### NOTE && NEW
+```
+// note:
+// !!default enable automatic reconnect if host is unreachable
+
+// new Apis
+wamp.debugOn();
+wamp.debugOff();
+wamp.WAMP_STATUS;
+wamp.STATUS;
+
+
+// add onstatuschange, this can replace onopen and onclose;
+connection.onstatuschange(status, details);
+// status-> STATUS.DISCONNECTED, details-><close details>
+// status-> STATUS.CONNECTING, details->undefined
+// status-> STATUS.CONNECTED, details-><onjoin details>
+// status-> STATUS.CLOSED, details-><close details>
+```

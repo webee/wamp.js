@@ -3,11 +3,33 @@ import * as log from './log';
 import * as util from './util';
 import { Session } from './session';
 
+export const CLOSE_REASON = {
+	UNSUPPORTED: 'unsupported',
+	UNREACHABLE: 'unreachable',
+	LOST: "lost",
+	CLOSED: "closed"
+};
+
+// wamp status, not transport status.
+export const STATUS = {
+	DISCONNECTED: 'DISCONNECTED',
+	CONNECTING: 'CONNECTING',
+	CONNECTED: 'CONNECTED',
+	CLOSED: 'CLOSED'
+};
+
 export class Connection {
 	constructor(options) {
 		var self = this;
 
 		self._options = options;
+
+		// APIs
+		self.onopen = undefined;
+		self.onclose = undefined;
+		self._status = STATUS.DISCONNECTED;
+		self.onstatuschange = function (status, details) {
+		};
 
 		// WAMP transport
 		//
@@ -85,24 +107,20 @@ export class Connection {
 		return deferred;
 	}
 
+	get status() {
+		return this._status;
+	}
+
 	get session() {
 		return this._session;
 	}
 
 	get isOpen() {
-		if (this._session && this._session.isOpen) {
-			return true;
-		} else {
-			return false;
-		}
+		return !!(this._session && this._session.isOpen);
 	}
 
 	get isConnected() {
-		if (this._transport) {
-			return true;
-		} else {
-			return false;
-		}
+		return !!this._transport;
 	}
 
 	get transport() {
@@ -121,9 +139,8 @@ export class Connection {
 		var self = this;
 		// WAMP transport
 		//
-		var transports, transport_options, transport_factory, transport_factory_klass;
+		var transport_options, transport_factory, transport_factory_klass;
 
-		transports = self._options.transports;
 		for (var i = 0; i < self._options.transports.length; ++i) {
 			// cascading transports until we find one which works
 			transport_options = self._options.transports[i];
@@ -214,6 +231,11 @@ export class Connection {
 		return res;
 	}
 
+	_change_status(status, details) {
+		this._status = status;
+		this.onstatuschange(status, details);
+	}
+
 	open() {
 		var self = this;
 
@@ -225,6 +247,8 @@ export class Connection {
 		self._retry = true;
 
 		function retry() {
+			// emit status
+			self._change_status(STATUS.CONNECTING);
 
 			// create a WAMP transport
 			self._transport = self._create_transport();
@@ -232,15 +256,19 @@ export class Connection {
 			if (!self._transport) {
 				// failed to create a WAMP transport
 				self._retry = false;
+				var details = {
+					close_reason: CLOSE_REASON.UNSUPPORTED,
+					reason: null,
+					message: null,
+					retry_delay: null,
+					retry_count: null,
+					will_retry: false
+				};
+				// emit status
+				self._change_status(STATUS.CLOSED, details);
+
 				if (self.onclose) {
-					var details = {
-						reason: null,
-						message: null,
-						retry_delay: null,
-						retry_count: null,
-						will_retry: false
-					};
-					self.onclose("unsupported", details);
+					self.onclose(details.close_reason, details);
 				}
 				return;
 			}
@@ -251,6 +279,7 @@ export class Connection {
 			self._session_close_message = null;
 
 			self._transport.onopen = function () {
+				log.debug(`${self._transport.info.type} transport open`);
 
 				// reset auto-reconnect timer and tracking
 				self._autoreconnect_reset();
@@ -263,18 +292,19 @@ export class Connection {
 			};
 
 			self._session.onjoin = function (details) {
-				if (self.onopen) {
-					try {
+				// ... WAMP session is now attached to realm.
+				try {
+					// emit status
+					self._change_status(STATUS.CONNECTED, details);
+
+					// TODO: remove onclose and onopen.
+					if (self.onopen) {
 						self.onopen(self._session, details);
-					} catch (e) {
-						log.debug("Exception raised from app code while firing Connection.onopen()", e);
 					}
+				} catch (e) {
+					log.debug("Exception raised from app code while firing Connection.onopen()", e);
 				}
 			};
-
-			//
-			// ... WAMP session is now attached to realm.
-			//
 
 			self._session.onleave = function (reason, details) {
 				self._session_close_reason = reason;
@@ -284,7 +314,6 @@ export class Connection {
 			};
 
 			self._transport.onclose = function (evt) {
-
 				// remove any pending reconnect timer
 				self._autoreconnect_reset_timer();
 
@@ -292,36 +321,45 @@ export class Connection {
 
 				var reason = null;
 				if (self._connect_successes === 0) {
-					reason = "unreachable";
+					reason = CLOSE_REASON.UNREACHABLE;
 					if (!self._retry_if_unreachable) {
 						self._retry = false;
 					}
-
 				} else if (!evt.wasClean) {
-					reason = "lost";
-
+					reason = CLOSE_REASON.LOST;
 				} else {
-					reason = "closed";
+					reason = CLOSE_REASON.CLOSED;
 				}
 
 				var next_retry = self._autoreconnect_advance();
 
 				// fire app code handler
 				//
-				if (self.onclose) {
-					var details = {
-						reason: self._session_close_reason,
-						message: self._session_close_message,
-						retry_delay: next_retry.delay,
-						retry_count: next_retry.count,
-						will_retry: next_retry.will_retry
-					};
-					try {
-						// Connection.onclose() allows to cancel any subsequent retry attempt
-						var stop_retrying = self.onclose(reason, details);
-					} catch (e) {
-						log.debug("Exception raised from app code while firing Connection.onclose()", e);
+				var details = {
+					close_reason: reason,
+					reason: self._session_close_reason,
+					message: self._session_close_message,
+					retry_delay: next_retry.delay,
+					retry_count: next_retry.count,
+					will_retry: next_retry.will_retry
+				};
+				try {
+					var stop_retrying;
+					if (details.will_retry) {
+						// emit status
+						stop_retrying = self._change_status(STATUS.DISCONNECTED, details);
+					} else {
+						// emit status
+						self._change_status(STATUS.CLOSED, details);
 					}
+
+					// TODO: remove onclose and onopen.
+					if (self.onclose) {
+						// Connection.onclose() allows to cancel any subsequent retry attempt
+						stop_retrying = self.onclose(details.close_reason, details);
+					}
+				} catch (e) {
+					log.debug("Exception raised from app code while firing Connection.onclose()", e);
 				}
 
 				// reset session info
@@ -336,19 +374,24 @@ export class Connection {
 				// automatic reconnection
 				//
 				if (self._retry && !stop_retrying) {
-
 					if (next_retry.will_retry) {
-
 						self._is_retrying = true;
 
 						log.debug("retrying in " + next_retry.delay + " s");
 						self._retry_timer = setTimeout(retry, next_retry.delay * 1000);
-
 					} else {
 						log.debug("giving up trying to reconnect");
 					}
 				}
-			}
+				if (self.status !== STATUS.CLOSED) {
+					details.will_retry = false;
+					// emit status
+					self._change_status(STATUS.CLOSED, details);
+				}
+			};
+
+			// open transport.
+			self._transport.open();
 		}
 
 		retry();

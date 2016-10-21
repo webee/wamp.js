@@ -31,6 +31,7 @@ export class Factory {
 				url: self._options.url,
 				protocol: null
 			},
+			open: undefined,
 			// these will get defined further below
 			protocol: undefined,
 			serializer: undefined,
@@ -48,7 +49,7 @@ export class Factory {
 
 		// running in the browser or react-native
 		//
-		(function () {
+		transport.open = function () {
 			var websocket;
 
 			// Chrome, MSIE, newer Firefox
@@ -75,7 +76,7 @@ export class Factory {
 
 				var msg = transport.serializer.unserialize(evt.data);
 				transport.onmessage(msg);
-			}
+			};
 
 			websocket.onopen = function (evt) {
 				if (!websocket.protocol) {
@@ -92,16 +93,16 @@ export class Factory {
 
 				transport.info.protocol = websocket.protocol;
 				transport.onopen();
-			}
+			};
 
 			websocket.onclose = function (evt) {
 				var details = {
 					code: evt.code,
 					reason: evt.message,
 					wasClean: evt.wasClean
-				}
+				};
 				transport.onclose(details);
-			}
+			};
 
 			// do NOT do the following, since that will make
 			// transport.onclose() fire twice (browsers already fire
@@ -112,12 +113,12 @@ export class Factory {
 				var payload = transport.serializer.serialize(msg);
 				log.debug("WebSocket transport send", payload);
 				websocket.send(payload);
-			}
+			};
 
 			transport.close = function (code, reason) {
 				websocket.close(code, reason);
 			};
-		})();
+		};
 
 		return transport;
 	}

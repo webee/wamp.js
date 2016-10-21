@@ -18,7 +18,7 @@ function pcall(f, ...args) {
 	return new Promise((resolve, reject) => {
 		try {
 			resolve(f.call(null, ...args));
-		}catch(err) {
+		} catch (err) {
 			reject(err);
 		}
 	});
@@ -220,7 +220,7 @@ export class Session {
 		self._publisher_disclose_me = false;
 
 		self._send_wamp = function (msg) {
-			log.debug(msg);
+			log.debug("send wamp:", msg);
 			// forward WAMP message to be sent to WAMP transport
 			self._socket.send(msg);
 		};
@@ -1372,7 +1372,7 @@ export class Session {
 		}
 	}
 
-	prefix = function (prefix, uri) {
+	prefix(prefix, uri) {
 		util.assert(typeof prefix === 'string', "Session.prefix: <prefix> must be a string");
 		util.assert(!uri || typeof uri === 'string', "Session.prefix: <uri> must be a string or falsy");
 
