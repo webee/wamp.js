@@ -246,155 +246,183 @@ export class Connection {
 		self._autoreconnect_reset();
 		self._retry = true;
 
-		function retry() {
+		this._do_retry();
+	}
+
+	_do_retry() {
+		var self = this;
+		if (self.status === STATUS.CONNECTING) {
+			return;
+		}
+
+		// emit status
+		self._change_status(STATUS.CONNECTING);
+
+		log.debug("trying to connect.");
+		// create a WAMP transport
+		self._transport = self._create_transport();
+
+		if (!self._transport) {
+			// failed to create a WAMP transport
+			self._retry = false;
+			var details = {
+				close_reason: CLOSE_REASON.UNSUPPORTED,
+				reason: null,
+				message: null,
+				retry_delay: null,
+				retry_count: null,
+				will_retry: false
+			};
 			// emit status
-			self._change_status(STATUS.CONNECTING);
+			self._change_status(STATUS.CLOSED, details);
 
-			// create a WAMP transport
-			self._transport = self._create_transport();
+			if (self.onclose) {
+				self.onclose(details.close_reason, details);
+			}
+			return;
+		}
 
-			if (!self._transport) {
-				// failed to create a WAMP transport
-				self._retry = false;
-				var details = {
-					close_reason: CLOSE_REASON.UNSUPPORTED,
-					reason: null,
-					message: null,
-					retry_delay: null,
-					retry_count: null,
-					will_retry: false
-				};
+		// create a new WAMP session using the WebSocket connection as transport
+		self._session = new Session(self._transport, self._defer, self._options.onchallenge);
+		self._session_close_reason = null;
+		self._session_close_message = null;
+
+		self._transport.onopen = function () {
+			log.debug(`${self._transport.info.type} transport open`);
+
+			// reset auto-reconnect timer and tracking
+			self._autoreconnect_reset();
+
+			// log successful connections
+			self._connect_successes += 1;
+
+			// start WAMP session
+			self._session.join(self._options.realm, self._options.authmethods, self._options.authid);
+		};
+
+		self._session.onjoin = function (details) {
+			// ... WAMP session is now attached to realm.
+			try {
 				// emit status
-				self._change_status(STATUS.CLOSED, details);
+				self._change_status(STATUS.CONNECTED, details);
 
-				if (self.onclose) {
-					self.onclose(details.close_reason, details);
+				// TODO: remove onclose and onopen.
+				if (self.onopen) {
+					self.onopen(self._session, details);
 				}
-				return;
+			} catch (e) {
+				log.debug("Exception raised from app code while firing Connection.onopen()", e);
+			}
+		};
+
+		self._session.onleave = function (reason, details) {
+			self._session_close_reason = reason;
+			self._session_close_message = details.message || "";
+			self._retry = false;
+			self._transport.close(1000);
+		};
+
+		self._transport.onclose = function (evt) {
+			// remove any pending reconnect timer
+			self._autoreconnect_reset_timer();
+
+			self._transport = null;
+
+			var reason = null;
+			if (self._connect_successes === 0) {
+				reason = CLOSE_REASON.UNREACHABLE;
+				if (!self._retry_if_unreachable) {
+					self._retry = false;
+				}
+			} else if (!evt.wasClean) {
+				reason = CLOSE_REASON.LOST;
+			} else {
+				reason = CLOSE_REASON.CLOSED;
 			}
 
-			// create a new WAMP session using the WebSocket connection as transport
-			self._session = new Session(self._transport, self._defer, self._options.onchallenge);
-			self._session_close_reason = null;
-			self._session_close_message = null;
+			var next_retry = self._autoreconnect_advance();
 
-			self._transport.onopen = function () {
-				log.debug(`${self._transport.info.type} transport open`);
-
-				// reset auto-reconnect timer and tracking
-				self._autoreconnect_reset();
-
-				// log successful connections
-				self._connect_successes += 1;
-
-				// start WAMP session
-				self._session.join(self._options.realm, self._options.authmethods, self._options.authid);
+			// fire app code handler
+			//
+			var details = {
+				close_reason: reason,
+				reason: self._session_close_reason,
+				message: self._session_close_message,
+				retry_delay: next_retry.delay,
+				retry_count: next_retry.count,
+				will_retry: next_retry.will_retry
 			};
-
-			self._session.onjoin = function (details) {
-				// ... WAMP session is now attached to realm.
-				try {
+			try {
+				var stop_retrying;
+				if (details.will_retry) {
 					// emit status
-					self._change_status(STATUS.CONNECTED, details);
-
-					// TODO: remove onclose and onopen.
-					if (self.onopen) {
-						self.onopen(self._session, details);
-					}
-				} catch (e) {
-					log.debug("Exception raised from app code while firing Connection.onopen()", e);
-				}
-			};
-
-			self._session.onleave = function (reason, details) {
-				self._session_close_reason = reason;
-				self._session_close_message = details.message || "";
-				self._retry = false;
-				self._transport.close(1000);
-			};
-
-			self._transport.onclose = function (evt) {
-				// remove any pending reconnect timer
-				self._autoreconnect_reset_timer();
-
-				self._transport = null;
-
-				var reason = null;
-				if (self._connect_successes === 0) {
-					reason = CLOSE_REASON.UNREACHABLE;
-					if (!self._retry_if_unreachable) {
-						self._retry = false;
-					}
-				} else if (!evt.wasClean) {
-					reason = CLOSE_REASON.LOST;
+					stop_retrying = self._change_status(STATUS.DISCONNECTED, details);
 				} else {
-					reason = CLOSE_REASON.CLOSED;
-				}
-
-				var next_retry = self._autoreconnect_advance();
-
-				// fire app code handler
-				//
-				var details = {
-					close_reason: reason,
-					reason: self._session_close_reason,
-					message: self._session_close_message,
-					retry_delay: next_retry.delay,
-					retry_count: next_retry.count,
-					will_retry: next_retry.will_retry
-				};
-				try {
-					var stop_retrying;
-					if (details.will_retry) {
-						// emit status
-						stop_retrying = self._change_status(STATUS.DISCONNECTED, details);
-					} else {
-						// emit status
-						self._change_status(STATUS.CLOSED, details);
-					}
-
-					// TODO: remove onclose and onopen.
-					if (self.onclose) {
-						// Connection.onclose() allows to cancel any subsequent retry attempt
-						stop_retrying = self.onclose(details.close_reason, details);
-					}
-				} catch (e) {
-					log.debug("Exception raised from app code while firing Connection.onclose()", e);
-				}
-
-				// reset session info
-				//
-				if (self._session) {
-					self._session._id = null;
-					self._session = null;
-					self._session_close_reason = null;
-					self._session_close_message = null;
-				}
-
-				// automatic reconnection
-				//
-				if (self._retry && !stop_retrying) {
-					if (next_retry.will_retry) {
-						self._is_retrying = true;
-
-						log.debug("retrying in " + next_retry.delay + " s");
-						self._retry_timer = setTimeout(retry, next_retry.delay * 1000);
-					} else {
-						log.debug("giving up trying to reconnect");
-					}
-				}
-				if (self.status !== STATUS.CLOSED) {
-					details.will_retry = false;
 					// emit status
 					self._change_status(STATUS.CLOSED, details);
 				}
-			};
 
-			// open transport.
-			self._transport.open();
+				// TODO: remove onclose and onopen.
+				if (self.onclose) {
+					// Connection.onclose() allows to cancel any subsequent retry attempt
+					stop_retrying = self.onclose(details.close_reason, details);
+				}
+			} catch (e) {
+				log.debug("Exception raised from app code while firing Connection.onclose()", e);
+			}
+
+			// reset session info
+			//
+			if (self._session) {
+				self._session._id = null;
+				self._session = null;
+				self._session_close_reason = null;
+				self._session_close_message = null;
+			}
+
+			// automatic reconnection
+			//
+			if (self._retry && !stop_retrying) {
+				if (next_retry.will_retry) {
+					self._is_retrying = true;
+
+					log.debug("retrying in " + next_retry.delay + " s");
+					self._retry_timer = setTimeout(::self._do_retry, next_retry.delay * 1000);
+				} else {
+					log.debug("giving up trying to reconnect");
+				}
+			}
+			if (self.status !== STATUS.CLOSED) {
+				details.will_retry = false;
+				// emit status
+				self._change_status(STATUS.CLOSED, details);
+			}
+		};
+
+		// open transport.
+		self._transport.open();
+	}
+
+	/**
+	 * initiative to retry immediately
+	 */
+	retry() {
+		var self = this;
+		if (self.status !== STATUS.CONNECTED && self._retry) {
+			self._autoreconnect_reset();
+			this._do_retry();
 		}
+	}
 
-		retry();
+	/**
+	 * notify network offline event.
+	 */
+	networkOffline() {
+		if (this._transport) {
+			log.debug("network offline, close transport");
+			this._transport.close(1000);
+			this._do_retry();
+		}
 	}
 
 	close(reason, message) {

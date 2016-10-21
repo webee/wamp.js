@@ -1,6 +1,6 @@
 {
   "name": "wamp.js",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "The Web Application Messaging Protocol.",
   "main": "./dist/index.js",
   "scripts": {

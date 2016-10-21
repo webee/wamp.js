@@ -26,7 +26,7 @@ new wamp.Connection(...);
 // note:
 // !!default enable automatic reconnect if host is unreachable
 
-// new Apis
+// new APIs and constants.
 wamp.debugOn();
 wamp.debugOff();
 wamp.WAMP_STATUS;
@@ -39,4 +39,12 @@ connection.onstatuschange(status, details);
 // status-> STATUS.CONNECTING, details->undefined
 // status-> STATUS.CONNECTED, details-><onjoin details>
 // status-> STATUS.CLOSED, details-><close details>
+
+
+// add retry and networkOffline notify.
+// 1. automatic reconnect is not useful as retry interval time get longer, when network resume online, you must wait.
+// 2. as WebSocket in browser(at least chrome) does not close when turn off network,
+//       but it cannot send or recevie msgs, so I want to close it manually.
+connection.retry(); // initiate to reconnect.
+connection.networkOffline(); // notify to close transport.
 ```
