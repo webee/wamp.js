@@ -1,7 +1,7 @@
 {
   "name": "wamp.js",
-  "version": "0.1.4",
-  "description": "The Web Application Messaging Protocol.",
+  "version": "0.1.5",
+  "description": "The Web Application Messaging Protocol for react-native and web browser.",
   "main": "./dist/index.js",
   "scripts": {
     "dev": "babel -w js --out-dir dist",
@@ -20,7 +20,10 @@
     "react-native",
     "js",
     "autobahn",
-    "websocket"
+    "autobahn-js",
+    "websocket",
+    "rpc",
+    "pub/sub"
   ],
   "author": "webee.yw <webee.yw@gmail.com>",
   "license": "MIT",
