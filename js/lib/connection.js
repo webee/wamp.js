@@ -419,7 +419,7 @@ export class Connection {
 	 */
 	retry() {
 		var self = this;
-		if (self.status !== STATUS.CONNECTED && self._retry) {
+		if (self.status !== STATUS.CONNECTED) {
 			self._autoreconnect_reset();
 			self._retry = true;
 			self._do_retry();
