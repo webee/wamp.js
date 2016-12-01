@@ -421,18 +421,21 @@ export class Connection {
 		var self = this;
 		if (self.status !== STATUS.CONNECTED && self._retry) {
 			self._autoreconnect_reset();
-			this._do_retry();
+			self._retry = true;
+			self._do_retry();
 		}
 	}
 
 	/**
-	 * notify network offline event.
+	 * notify network offline event, stop retry.
 	 */
 	networkOffline() {
-		if (this._transport) {
-			log.debug("network offline, close transport");
-			this._transport.close(1000);
-			this._do_retry();
+		var self = this;
+		log.debug("network offline, close transport and stop retry");
+		self._retry = false;
+		self._autoreconnect_reset();
+		if (self._transport) {
+			self._transport.close(1000);
 		}
 	}
 
