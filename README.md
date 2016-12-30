@@ -48,7 +48,7 @@ connection.onstatuschange(status, details);
 connection.retry(); // initiate to reconnect.
 connection.networkOffline(); // notify to close transport.
 
-// add .ping() and .addOnpongListener()
+// add .ping() and .addOnpongListener(handler)
 session.ping()
-session.addOnponListener()
+session.addOnponListener(handler)
 ```
