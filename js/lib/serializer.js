@@ -7,6 +7,9 @@ export class JSONSerializer {
 	}
 
 	serialize(obj) {
+		if (obj === undefined) {
+			return "";
+		}
 		return JSON.stringify(obj, this.replacer);
 	}
 

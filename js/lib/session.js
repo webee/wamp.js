@@ -1106,7 +1106,7 @@ export class Session {
 
 	ping() {
 		log.debug("send ping");
-		this._socket.send("");
+		this._socket.send(undefined);
 	}
 
 	addOnpongListener(listener) {
