@@ -196,6 +196,7 @@ export class Session {
 		self._transport_is_closing = false;
 
 		// outstanding requests;
+		self._onpong_listeners = {};
 		self._publish_reqs = {};
 		self._subscribe_reqs = {};
 		self._unsubscribe_reqs = {};
@@ -791,6 +792,11 @@ export class Session {
 
 		// callback fired by WAMP transport on receiving a WAMP message
 		//
+		self._socket.onpong = function () {
+			for (let l in this._onpong_listeners) {
+				l();
+			}
+		};
 		self._socket.onmessage = function (msg) {
 
 			var msg_type = msg[0];
@@ -1096,6 +1102,19 @@ export class Session {
 		var msg = [MSG_TYPE.GOODBYE, details, reason];
 		self._send_wamp(msg);
 		self._goodbye_sent = true;
+	}
+
+	ping() {
+		log.debug("send ping");
+		this._socket.send("");
+	}
+
+	addOnpongListener(listener) {
+		util.assert(typeof listener === 'function', "listener must be a function");
+
+		var self = this;
+
+		self._onpong_listeners[listener] = listener;
 	}
 
 	call(procedure, args, kwargs, options) {

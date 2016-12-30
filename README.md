@@ -47,4 +47,8 @@ connection.onstatuschange(status, details);
 //       but it cannot send or recevie msgs, so I want to close it manually.
 connection.retry(); // initiate to reconnect.
 connection.networkOffline(); // notify to close transport.
+
+// add .ping() and .addOnpongListener()
+session.ping()
+session.addOnponListener()
 ```

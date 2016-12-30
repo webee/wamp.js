@@ -1,6 +1,6 @@
 {
   "name": "wamp.js",
-  "version": "0.1.7",
+  "version": "0.2.0",
   "description": "The Web Application Messaging Protocol for react-native and web browser.",
   "main": "./dist/index.js",
   "scripts": {

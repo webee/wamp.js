@@ -39,6 +39,8 @@ export class Factory {
 			close: undefined,
 
 			// these will get overridden by the WAMP session using this transport
+			onpong: function () {
+			},
 			onmessage: function () {
 			},
 			onopen: function () {
@@ -74,8 +76,12 @@ export class Factory {
 			websocket.onmessage = function (evt) {
 				log.debug("WebSocket transport receive", evt.data);
 
-				var msg = transport.serializer.unserialize(evt.data);
-				transport.onmessage(msg);
+				if (evt.data.length === 0) {
+					transport.onpong();
+				} else {
+					var msg = transport.serializer.unserialize(evt.data);
+					transport.onmessage(msg);
+				}
 			};
 
 			websocket.onopen = function (evt) {
