@@ -793,8 +793,6 @@ export class Session {
 		// callback fired by WAMP transport on receiving a WAMP message
 		//
 		self._socket.onpong = function () {
-			var self = this;
-
 			for (let i in self._onpong_listeners) {
 				self._onpong_listeners[i]();
 			}
