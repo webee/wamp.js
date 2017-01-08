@@ -239,8 +239,10 @@ export class Connection {
 	open() {
 		var self = this;
 
+		log.debug("start to open.");
 		if (self._transport) {
-			throw "connection already open (or opening)";
+			log.debug("connection already open (or opening)");
+			return;
 		}
 
 		self._autoreconnect_reset();
@@ -323,8 +325,13 @@ export class Connection {
 		};
 
 		self._transport.onclose = (function (evt) {
+			log.debug('onclose:', evt);
 			if (this !== self._transport) {
 				// already tried reconnect.
+				return;
+			}
+			if (self._status === STATUS.CLOSED) {
+				// already closed.
 				return;
 			}
 
@@ -419,6 +426,7 @@ export class Connection {
 	 */
 	retry() {
 		var self = this;
+		log.debug("initiative retry");
 		if (self.status !== STATUS.CONNECTED) {
 			self._autoreconnect_reset();
 			self._retry = true;
@@ -435,7 +443,7 @@ export class Connection {
 		self._retry = false;
 		self._autoreconnect_reset();
 		if (self._transport) {
-			self._transport.close(1000);
+			self._transport.close(1000, "network offline", false);
 		}
 	}
 
@@ -447,6 +455,8 @@ export class Connection {
 		// the app wants to close .. don't retry
 		this._retry = false;
 
+		this._transport.close(1000, "close", false);
+		/* FIXME:
 		if (this._session && this._session.isOpen) {
 			// if there is an open session, close that first.
 			this._session.leave(reason, message);
@@ -454,5 +464,6 @@ export class Connection {
 			// no session active: just close the transport
 			this._transport.close(1000);
 		}
+		*/
 	}
 }

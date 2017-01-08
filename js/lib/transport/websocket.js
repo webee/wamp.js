@@ -121,8 +121,10 @@ export class Factory {
 				websocket.send(payload);
 			};
 
-			transport.close = function (code, reason) {
+			transport.close = function (code, reason, wasClean=true) {
 				websocket.close(code, reason);
+				// as websocket may not response onclose, we close by the way.
+				websocket.onclose({code, reason, wasClean});
 			};
 		};
 
