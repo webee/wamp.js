@@ -2,6 +2,9 @@ import * as util from '../util';
 import * as log from '../log';
 import * as serializer from '../serializer';
 
+const EMPTY_FUNCTION = function () {
+};
+
 export class Factory {
 	constructor(options) {
 		var self = this;
@@ -39,14 +42,10 @@ export class Factory {
 			close: undefined,
 
 			// these will get overridden by the WAMP session using this transport
-			onpong: function () {
-			},
-			onmessage: function () {
-			},
-			onopen: function () {
-			},
-			onclose: function () {
-			}
+			onpong: EMPTY_FUNCTION,
+			onmessage: EMPTY_FUNCTION,
+			onopen: EMPTY_FUNCTION,
+			onclose: EMPTY_FUNCTION
 		};
 
 		// running in the browser or react-native
@@ -108,6 +107,8 @@ export class Factory {
 					wasClean: evt.wasClean
 				};
 				transport.onclose(details);
+				// clear callbacks.
+				transport.onclose = EMPTY_FUNCTION;
 			};
 
 			// do NOT do the following, since that will make
@@ -122,6 +123,11 @@ export class Factory {
 			};
 
 			transport.close = function (code, reason, wasClean=true) {
+				// clear callbacks.
+				transport.onopen = EMPTY_FUNCTION;
+				transport.onpong = EMPTY_FUNCTION;
+				transport.onmessage = EMPTY_FUNCTION;
+
 				websocket.close(code, reason);
 				// as websocket may not response onclose, we close by the way.
 				websocket.onclose({code, reason, wasClean});
