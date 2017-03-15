@@ -9,7 +9,12 @@ Date.now = Date.now || function () {
 
 // WAMP "Advanced Profile" support in AutobahnJS per role
 // ignore now.
-const WAMP_FEATURES = {};
+const WAMP_FEATURES = {
+  publisher: {},
+  subscriber: {},
+  caller: {},
+  callee: {},
+};
 
 
 // replace when/function/call
