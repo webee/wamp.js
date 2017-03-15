@@ -5,7 +5,7 @@ This Project is ported from [autobahn-js](https://github.com/crossbario/autobahn
 
 ### install
 ```
-npm i -S wamp.js2
+npm install --save wamp.js2
 ```
 or
 ```
