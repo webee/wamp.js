@@ -5,7 +5,11 @@ This Project is ported from [autobahn-js](https://github.com/crossbario/autobahn
 
 ### install
 ```
-npm i -S wamp.js
+npm i -S wamp.js2
+```
+or
+```
+yarn add wamp.js2
 ```
 
 ### API
